@@ -556,11 +556,11 @@ func TestSaveCheckpoint_Insert(t *testing.T) {
 	reader := NewEventReader(db, logger, emailConfig)
 
 	checkpoint := &ProcessingCheckpoint{
-		ConsumerID:             "test-consumer",
-		LastEventID:            100,
-		LastEventTimestamp:     time.Now(),
-		TotalEventsProcessed:   100,
-		ProcessingNode:         "test-node",
+		ConsumerID:           "test-consumer",
+		LastEventID:          100,
+		LastEventTimestamp:   time.Now(),
+		TotalEventsProcessed: 100,
+		ProcessingNode:       "test-node",
 	}
 
 	mock.ExpectExec("INSERT INTO idp.event_processing_checkpoint").
@@ -589,11 +589,11 @@ func TestSaveCheckpoint_Update(t *testing.T) {
 	reader := NewEventReader(db, logger, emailConfig)
 
 	checkpoint := &ProcessingCheckpoint{
-		ConsumerID:             "test-consumer",
-		LastEventID:            200,
-		LastEventTimestamp:     time.Now(),
-		TotalEventsProcessed:   200,
-		ProcessingNode:         "test-node-2",
+		ConsumerID:           "test-consumer",
+		LastEventID:          200,
+		LastEventTimestamp:   time.Now(),
+		TotalEventsProcessed: 200,
+		ProcessingNode:       "test-node-2",
 	}
 
 	// ON CONFLICT DO UPDATE
@@ -623,11 +623,11 @@ func TestSaveCheckpoint_Error(t *testing.T) {
 	reader := NewEventReader(db, logger, emailConfig)
 
 	checkpoint := &ProcessingCheckpoint{
-		ConsumerID:             "test-consumer",
-		LastEventID:            100,
-		LastEventTimestamp:     time.Now(),
-		TotalEventsProcessed:   100,
-		ProcessingNode:         "test-node",
+		ConsumerID:           "test-consumer",
+		LastEventID:          100,
+		LastEventTimestamp:   time.Now(),
+		TotalEventsProcessed: 100,
+		ProcessingNode:       "test-node",
 	}
 
 	mock.ExpectExec("INSERT INTO idp.event_processing_checkpoint").

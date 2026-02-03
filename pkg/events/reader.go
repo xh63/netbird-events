@@ -311,7 +311,6 @@ func (er *EventReader) GetEventCount(ctx context.Context, opts EventQueryOptions
 	return count, nil
 }
 
-
 // GetWriterCheckpoint retrieves the checkpoint for a specific consumer/writer combination
 // Deprecated: Use GetCheckpoint for single-checkpoint model (migration 003+)
 func (er *EventReader) GetWriterCheckpoint(ctx context.Context, consumerID, writerType string) (*ProcessingCheckpoint, error) {
