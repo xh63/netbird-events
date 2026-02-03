@@ -1,0 +1,49 @@
+# Binaries
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go build/coverage
+*.out
+coverage.txt
+
+# Dependency directories
+vendor/
+
+# Environment files
+.env
+*.env
+
+# Config files with secrets
+config.yaml
+*.local.yaml
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# SSL/TLS certificates
+*.pem
+*.key
+*.crt
+*.p12
+ssl/
+
+# Logs
+*.log
+logs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3

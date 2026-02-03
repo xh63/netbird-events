@@ -1,0 +1,105 @@
+version: 2
+
+# Project name matches GitHub repository
+project_name: netbird-events
+
+# this requires the env variable GORELEASER_PREVIOUS_TAG which we compute in scripts/parse_version.sh
+# in a monorepo goreleaser does not do it for us
+changelog:
+  disable: true
+
+builds:
+  - id: eventsproc
+    main: ./cmd/main.go
+    binary: eventsproc
+    ldflags:
+      - "-X main.version={{ .Env.MAIN_VERSION }}"
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+    flags:
+      - -trimpath
+
+snapshot:
+  version_template: "{{ .Env.MAIN_VERSION }}-next"
+archives:
+  - name_template: "eventsproc-{{ .Env.MAIN_VERSION }}-{{ .Env.ITERATION }}.{{ .Arch }}"
+
+nfpms:
+  - id: eventsproc-rpm
+    package_name: eventsproc
+    vendor: Global Infrastructure
+    maintainer: David Han <xiaopeng.han@worldline.com>
+    description: "NetBird Events Processing Service: exports events to Loki, Splunk, and systemd journal"
+    license: proprietary
+    # patch this in the CI, the OSS version does not allow to template this field
+    release: "##RELEASE##"
+    formats:
+      - rpm
+    bindir: /opt/app
+    contents:
+      - src: ./systemd/eventsproc.service
+        dst: /usr/lib/systemd/system/eventsproc.service
+        file_info:
+          owner: root
+          group: root
+          mode: 0644
+      - dst: /etc/app/eventsproc
+        type: dir
+        file_info:
+          owner: netbird
+          group: netbird
+          mode: 0750
+      - dst: /etc/app/eventsproc/ssl
+        type: dir
+        file_info:
+          owner: netbird
+          group: netbird
+          mode: 0750
+      - src: ./config.yaml.example
+        dst: /etc/app/eventsproc/config.yaml
+        type: "config|noreplace"
+        file_info:
+          owner: netbird
+          group: netbird
+          mode: 0600
+    scripts:
+      preinstall: ./scripts/preinstall.sh
+      postinstall: ./scripts/postinstall.sh
+      postremove: ./scripts/postremove.sh
+
+    # Output location
+    file_name_template: "{{ .ConventionalFileName }}"
+
+    rpm:
+      signature:
+        # Template to the PGP secret key file path (can also be ASCII-armored).
+        # The passphrase is taken from the environment variable
+        # `$NFPM_ID_RPM_PASSPHRASE` with a fallback to `$NFPM_ID_PASSPHRASE`,
+        # where ID is the id of the current nfpm config.
+        # The id will be transformed to uppercase.
+        # E.g. If your nfpm id is 'default' then the rpm-specific passphrase
+        # should be set as `$NFPM_DEFAULT_RPM_PASSPHRASE`
+        key_file: "{{ .Env.GPG_KEY_PATH }}"
+
+checksum:
+  name_template: "eventsproc_checksums.txt"
+
+# we need this, otherwise goreleaser requires GITHUB_TOKEN to run
+release:
+  disable: true
+
+artifactories:
+  - name: artifactory-repo
+    ids:
+      - eventsproc-rpm
+    exts:
+      - rpm
+    target: "https://{{ .Env.ARTIFACTORY_HOST }}/artifactory/{{ .Env.ARTIFACTORY_REPO }}/{{ .ProjectName }}/"
+    username: "{{ .Env.ARTIFACTORY_USER }}"
+    password: "{{ .Env.ARTIFACTORY_TOKEN }}"
+    checksum: true
+    signature: true

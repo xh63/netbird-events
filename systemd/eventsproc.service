@@ -1,0 +1,15 @@
+[Unit]
+Description=NetBird Events Processing Application
+After=network.target
+
+[Service]
+Type=simple
+User=netbird
+ExecStart=/opt/app/eventsproc --config /etc/app/eventsproc/config.yaml
+EnvironmentFile=-/etc/sysconfig/eventsproc
+Restart=on-failure
+WorkingDirectory=/opt/app
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

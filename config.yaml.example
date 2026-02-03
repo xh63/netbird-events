@@ -1,0 +1,370 @@
+# eventsproc configuration file
+# This file should be placed at /etc/app/eventsproc/config.yaml
+
+# ============================================================================
+# IMPORTANT: ARCHITECTURE CHANGE
+# ============================================================================
+# This version of eventsproc outputs JSON to stdout only.
+# Logs are captured by systemd journal and forwarded to Loki/Splunk using
+# OpenTelemetry Collector. See docs/OTEL_COLLECTOR_SETUP.md for details.
+# ============================================================================
+
+# ============================================================================
+# REQUIRED CONFIGURATION
+# ============================================================================
+
+# Database connection string (REQUIRED)
+# Format: "user=<username> password=YOUR_PASSWORD_HERE dbname=<database> host=<hostname>"
+# IMPORTANT: For production, use EP_POSTGRES_URL environment variable to avoid storing passwords in config files
+# Example for production:
+#   export EP_POSTGRES_URL="user=netbird_user password=YOUR_PASSWORD_HERE dbname=netbird host=postgres.example.com"
+# Fallback value for development/testing:
+postgres_url: "user=netbird password=YOUR_PASSWORD_HERE dbname=netbird host=postgres.example.com sslmode=disable"
+
+# ============================================================================
+# OPTIONAL CONFIGURATION (All have defaults)
+# ============================================================================
+
+# Platform (OPTIONAL - Default: "sandbox")
+# Purpose: Metadata label for filtering logs in multi-environment setups
+# Only appears in startup log: {"msg": "Starting events processor", "platform": "sandbox"}
+# Common values: sandbox, preprod, prod
+# Used to auto-generate consumer_id if not set: "eventsproc-{platform}-{region}"
+platform: "sandbox"
+
+# Region (OPTIONAL - Default: "apac")
+# Purpose: Metadata label for filtering logs in multi-region deployments
+# Only appears in startup log: {"msg": "Starting events processor", "region": "apac"}
+# Common values: apac, emea, us-east, eu-west
+# Used to auto-generate consumer_id if not set: "eventsproc-{platform}-{region}"
+region: "apac"
+
+# Consumer ID for checkpoint tracking (OPTIONAL - Auto-generated if not set)
+# Default: Auto-generated as "eventsproc-{platform}-{region}"
+# Purpose: Unique identifier for this consumer instance in the checkpoint table
+#
+# Auto-generation examples:
+#   platform=sandbox, region=apac  → consumer_id="eventsproc-sandbox-apac"
+#   platform=prod, region=emea     → consumer_id="eventsproc-prod-emea"
+#
+# Set explicitly for:
+#   - HA deployments with multiple instances (each needs unique ID)
+#   - Meaningful names in logs and database
+#
+# Production HA deployment examples:
+#   consumer_id: "netbird-mgmt-emea-1"  # EMEA production node 1
+#   consumer_id: "netbird-mgmt-emea-1"  # EMEA production node 2
+#   consumer_id: "netbird-mgmt-apac-1"  # APAC production node 1
+#
+# Leave empty or commented out for auto-generation:
+# consumer_id: ""
+
+# Log level (OPTIONAL - Default: "info")
+# Values: debug, info, warn, error
+log_level: "info"
+
+# Batch size for fetching events from database (OPTIONAL - Default: 1000)
+# Increase for better throughput, decrease for lower memory usage
+batch_size: 1000
+
+# How far back to process events in hours (OPTIONAL - Default: 24)
+# Only used on first run when no checkpoint exists
+# Set to 0 to process all events from the beginning
+lookback_hours: 24
+
+# Polling interval in seconds (OPTIONAL - Default: 0)
+# 0 = Run once and exit (good for cron jobs or one-time backfills)
+# >0 = Continuous polling mode (good for systemd services)
+# Recommended values for continuous mode: 30-300 seconds
+polling_interval: 30
+
+# ============================================================================
+# EMAIL ENRICHMENT CONFIGURATION (OPTIONAL)
+# ============================================================================
+# Email enrichment adds initiator_email and target_email fields to events
+# by joining with user tables. This is optional and highly configurable.
+#
+# NetBird stores user_id (Okta ID) in events but not email addresses.
+# This configuration controls how eventsproc looks up email addresses.
+#
+# IMPORTANT: Standard NetBird deployments don't have email in the database!
+# If using Okta (or other OIDC), NetBird only stores the user_id from the IdP.
+# The standard NetBird users table may have an email field, but it's often empty.
+
+email_enrichment:
+  # Enable email enrichment (OPTIONAL - Default: true)
+  # Set to false to disable email lookups entirely (events will show user_id only)
+  enabled: false
+
+  # Source for email enrichment (OPTIONAL - Default: "auto")
+  # Determines which table(s) to use for email lookups:
+  #
+  # "none" (Default - Disabled for privacy)
+  #   Disable email enrichment.
+  #   Events will show user_id only in initiator_email/target_email fields.
+  #
+  # "auto" (Recommended if enabling)
+  #   Try multiple sources in order with fallback:
+  #   1. okta_users table (if exists - Company custom table)
+  #   2. users table (standard NetBird table)
+  #   3. user_id (fallback if no email found)
+  #   This works for both Company deployments and standard NetBird installations.
+  #
+  # "idp_okta_users"
+  #   Use Company's custom okta_users table for email lookups.
+  #   This table is populated by Okta sync and contains accurate email addresses.
+  #   Only available in Company deployments.
+  #
+  # "netbird_users"
+  #   Use standard NetBird users table for email lookups.
+  #   This table may have email field, but it depends on your IdP configuration.
+  #   Works with standard NetBird deployments.
+  #
+  # "custom"
+  #   Use a custom table specified by custom_schema and custom_table.
+  #   The table must have 'id' and 'email' columns.
+  #   Example: custom_schema="public", custom_table="okta_users"
+  #
+  # "none"
+  #   Disable email enrichment (same as enabled: false).
+  #   Events will show user_id only in initiator_email/target_email fields.
+  #
+  source: "none"
+
+  # Custom schema and table (OPTIONAL - Only used if source="custom")
+  # The table must exist and have these columns:
+  #   - id: text or varchar (matches NetBird user_id)
+  #   - email: text or varchar
+  # custom_schema: "public"
+  # custom_table: "okta_users"
+
+# ============================================================================
+# EMAIL ENRICHMENT EXAMPLES
+# ============================================================================
+#
+# Example 1: Standard NetBird Deployment (RECOMMENDED)
+# -----------------------------------------------------
+# Let auto-detection find emails wherever they exist:
+#
+#   email_enrichment:
+#     enabled: false
+#     source: "auto"
+#
+# This tries okta_users first (if exists), falls back to users table,
+# then shows user_id if no email found. Works everywhere.
+#
+# Example 2: Company Deployment (with okta_users)
+# -----------------------------------------------------
+# Use Company's custom Okta sync table:
+#
+#   email_enrichment:
+#     enabled: false
+#     source: "none"
+#
+# This only works in Company environments where okta_users exists.
+#
+# Example 3: Standard NetBird (users table only)
+# -----------------------------------------------
+# Only use the standard NetBird users table:
+#
+#   email_enrichment:
+#     enabled: false
+#     source: "netbird_users"
+#
+# This works with standard NetBird, but emails may be empty if your IdP
+# doesn't sync email addresses to the users table.
+#
+# Example 4: Custom Table
+# -----------------------
+# Use your own user table:
+#
+#   email_enrichment:
+#     enabled: false
+#     source: "custom"
+#     custom_schema: "public"
+#     custom_table: "okta_users"
+#
+# Your table must have 'id' and 'email' columns.
+#
+# Example 5: Disable Email Enrichment
+# ------------------------------------
+# Show user_id only (no email lookups):
+#
+#   email_enrichment:
+#     enabled: false
+#
+# Or equivalently:
+#
+#   email_enrichment:
+#     enabled: false
+#     source: "none"
+#
+# Events will show user_id in initiator_email/target_email fields.
+#
+# ============================================================================
+# TROUBLESHOOTING EMAIL ENRICHMENT
+# ============================================================================
+#
+# Issue: Events show user_id instead of email
+# Solution: Check that your email source table exists and has data.
+#           Try source: "auto" to let eventsproc try all available sources.
+#
+# Issue: "relation okta_users does not exist"
+# Solution: This is normal for standard NetBird deployments.
+#           Change source to "netbird_users" or "auto" (recommended).
+#
+# Issue: Emails are empty or wrong
+# Solution: Verify that your user table actually contains email addresses.
+#           NetBird doesn't sync emails from IdP by default.
+#           Consider using source: "custom" to point to your own user table.
+#
+# Issue: Performance problems with email enrichment
+# Solution: Email enrichment uses LEFT JOIN which can be slow for large tables.
+#           Consider disabling it (enabled: false) if you don't need emails
+#           in the exported events.
+
+# ============================================================================
+# MINIMAL CONFIGURATION EXAMPLE
+# ============================================================================
+# You only NEED to set postgres_url. Everything else is optional!
+#
+# Minimal config.yaml:
+#   postgres_url: "user=netbird password=YOUR_PASSWORD_HERE dbname=netbird host=localhost"
+#   polling_interval: 60  # Optional: run continuously
+#
+# All other values will use these defaults:
+#   platform: "sandbox"
+#   region: "apac"
+#   consumer_id: "eventsproc-sandbox-apac"  (auto-generated)
+#   log_level: "info"
+#   batch_size: 1000
+#   lookback_hours: 24
+#   email_enrichment:
+#     enabled: false
+#     source: "auto"  (tries all available sources)
+
+# ============================================================================
+# ENVIRONMENT VARIABLES (override config file)
+# ============================================================================
+# All configuration values can be overridden via environment variables with
+# the EP_ prefix. This is recommended for sensitive values like database passwords.
+#
+# Environment variables:
+#   EP_POSTGRES_URL                      - Database connection string (REQUIRED)
+#   EP_PLATFORM                          - Platform (OPTIONAL - Default: "sandbox")
+#   EP_REGION                            - Region (OPTIONAL - Default: "apac")
+#   EP_CONSUMER_ID                       - Consumer ID (OPTIONAL - Auto-generated if not set)
+#   EP_LOG_LEVEL                         - Log level (OPTIONAL - Default: "info")
+#   EP_BATCH_SIZE                        - Batch size (OPTIONAL - Default: 1000)
+#   EP_LOOKBACK_HOURS                    - Lookback hours (OPTIONAL - Default: 24)
+#   EP_POLLING_INTERVAL                  - Polling interval (OPTIONAL - Default: 0)
+#   EP_EMAIL_ENRICHMENT_ENABLED          - Enable email enrichment (OPTIONAL - Default: true)
+#   EP_EMAIL_ENRICHMENT_SOURCE           - Email source (OPTIONAL - Default: "auto")
+#   EP_EMAIL_ENRICHMENT_CUSTOM_SCHEMA    - Custom schema (OPTIONAL - Only for source="custom")
+#   EP_EMAIL_ENRICHMENT_CUSTOM_TABLE     - Custom table (OPTIONAL - Only for source="custom")
+#
+# Example for production (minimal - only required setting):
+#   export EP_POSTGRES_URL="user=netbird_user password=YOUR_PASSWORD_HERE dbname=netbird host=db.example.com"
+#   ./eventsproc
+#
+# Example for production (with optional settings):
+#   export EP_POSTGRES_URL="user=netbird_user password=YOUR_PASSWORD_HERE dbname=netbird host=db.example.com"
+#   export EP_PLATFORM="prod"
+#   export EP_REGION="emea"
+#   export EP_CONSUMER_ID=$(hostname)  # Use hostname for HA deployments
+#   export EP_LOG_LEVEL="info"
+#   export EP_POLLING_INTERVAL=60
+#   ./eventsproc
+
+# ============================================================================
+# OUTPUT AND LOG FORWARDING
+# ============================================================================
+# eventsproc writes events to stdout in JSON format (one event per line).
+# When running as a systemd service, these logs are captured by systemd journal.
+#
+# To forward logs to Loki and Splunk, use OpenTelemetry Collector:
+# 1. Install otelcol-contrib on the same host
+# 2. Configure journald receiver to read from eventsproc service
+# 3. Configure Loki and Splunk HEC exporters
+# 4. Filter to only forward audit events (events with event_id field)
+#
+# See docs/OTEL_COLLECTOR_SETUP.md for complete setup instructions.
+
+# ============================================================================
+# QUERYING EVENTS
+# ============================================================================
+#
+# View events in systemd journal:
+#   # View the raw JSON output
+#   journalctl -u eventsproc -o cat
+#
+#   # View with journald metadata (useful for filtering by time, etc.)
+#   journalctl -u eventsproc
+#
+#   # Follow the logs in real-time
+#   journalctl -u eventsproc -f
+#
+#   # View only audit events (filter by event_id field)
+#   journalctl -u eventsproc -o cat | grep event_id
+#
+# Query Loki (via OTEL Collector - LogQL):
+#   {service_name="eventsproc"}
+#   {service_name="eventsproc"} | json
+#   {service_name="eventsproc"} | json | event_id != ""
+#   {service_name="eventsproc"} | json | activity_code == "user.login"
+#
+# Query Splunk (via OTEL Collector - SPL):
+#   index=netbird_events sourcetype="netbird:event"
+#   index=netbird_events sourcetype="netbird:event" platform=sandbox
+#   index=netbird_events sourcetype="netbird:event" activity_code="user.login"
+
+# ============================================================================
+# CONFIGURATION USE CASES
+# ============================================================================
+
+# Use Case 1: Local Development (Minimal)
+# ----------------------------------------
+# Just set the database URL and run once:
+#
+#   postgres_url: "user=netbird password=YOUR_PASSWORD_HERE dbname=netbird host=localhost"
+#   polling_interval: 0  # Run once and exit
+#
+# All other settings use defaults. Perfect for testing.
+
+# Use Case 2: Production Single Instance
+# ---------------------------------------
+# Set platform/region for meaningful logs, auto-generate consumer_id:
+#
+#   postgres_url: "user=netbird password=YOUR_PASSWORD_HERE dbname=netbird host=db-prod.example.com"
+#   platform: "prod"
+#   region: "emea"
+#   # consumer_id will auto-generate to "eventsproc-prod-emea"
+#   polling_interval: 60
+
+# Use Case 3: Production HA (Multiple Instances)
+# -----------------------------------------------
+# Each server needs a unique consumer_id:
+#
+# Server 1:
+#   export EP_POSTGRES_URL="..."
+#   export EP_PLATFORM="prod"
+#   export EP_REGION="emea"
+#   export EP_CONSUMER_ID="netbird-mgmt-emea-1"  # Unique!
+#   export EP_POLLING_INTERVAL=60
+#
+# Server 2:
+#   export EP_POSTGRES_URL="..."
+#   export EP_PLATFORM="prod"
+#   export EP_REGION="emea"
+#   export EP_CONSUMER_ID="netbird-mgmt-emea-1"  # Unique!
+#   export EP_POLLING_INTERVAL=60
+#
+# Each instance maintains separate checkpoints in the database.
+
+# Use Case 4: One-Time Backfill
+# ------------------------------
+# Process historical events once and exit:
+#
+#   postgres_url: "..."
+#   lookback_hours: 168  # Process last 7 days
+#   polling_interval: 0   # Exit after processing

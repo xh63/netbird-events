@@ -1,0 +1,150 @@
+// Grafana Alloy configuration for collecting application logs from systemd journal
+// and forwarding to Loki (mTLS) and Splunk HEC (OTEL)
+//
+// Label Strategy (Low Cardinality):
+//   - Labels: service_name, log_type (only 2 labels for low cardinality)
+//   - Structured Metadata: event_source, event_id, activity, host
+//   - Query metadata with: {service_name="eventsproc"} | logfmt | activity="user.login"
+
+// Read logs from systemd journal - only eventsproc service
+loki.source.journal "eventsproc_logs" {
+  // Only read eventsproc.service logs
+  matches = "_SYSTEMD_UNIT=eventsproc.service"
+
+  // Minimal labels to reduce cardinality - only service_name as a static label
+  labels = {
+    service_name = "eventsproc",
+  }
+
+  // Forward to processor
+  forward_to = [
+    loki.process.filter_and_format.receiver,
+  ]
+}
+
+// Process and extract fields from eventsproc logs
+loki.process "filter_and_format" {
+
+  // Extract classification fields and event data from JSON
+  stage.json {
+    expressions = {
+      log_type     = "log_type",
+      event_source = "event_source",
+      event_id     = "event_id",
+      activity     = "activity",
+      level        = "level",
+      msg          = "message",
+    }
+  }
+
+  // Add only log_type as a label (low cardinality)
+  stage.labels {
+    values = {
+      log_type = "log_type",
+    }
+  }
+
+  // Add other fields as structured metadata (queryable but not indexed as labels)
+  // These can be queried with | logfmt in Loki without increasing cardinality
+  stage.structured_metadata {
+    values = {
+      event_source = "event_source",
+      event_id     = "event_id",
+      activity     = "activity",
+      host         = constants.hostname,
+    }
+  }
+
+  // Forward to both Loki and OTEL receiver (for Splunk)
+  forward_to = [
+    loki.write.loki_endpoint.receiver,
+    loki.process.splunk_filter.receiver,
+  ]
+}
+
+// Write to Loki with mTLS
+loki.write "loki_endpoint" {
+  endpoint {
+    url = "https://loki.example.com:25430/loki/api/v1/push"
+
+    // mTLS configuration
+    tls_config {
+      cert_file = "/etc/alloy/ssl/rw-cert.pem"
+      key_file  = "/etc/alloy/ssl/rw-key.pem"
+      ca_file   = "/etc/alloy/ssl/rw-ca.pem"
+    }
+
+    // Batching configuration
+    batch_size = "1MB"
+    batch_wait = "1s"
+
+    // Optional: basic auth or bearer token if required
+    // bearer_token = env("LOKI_TOKEN")
+  }
+}
+
+// Optional: Filter for Splunk - only send application logs (audit events)
+// Remove this stage if you want to send all logs to Splunk
+loki.process "splunk_filter" {
+  // Only process logs with log_type = "application" (audit events)
+  stage.match {
+    selector = "{log_type=\"application\"}"
+    action   = "keep"
+
+    // Nested stage is required inside stage.match
+    // This stage.json extracts the log line content
+    stage.json {
+      expressions = {
+        content = "",
+      }
+    }
+  }
+
+  forward_to = [
+    otelcol.receiver.loki.splunk_logs.receiver,
+  ]
+}
+
+// Convert Loki logs to OpenTelemetry format for Splunk
+otelcol.receiver.loki "splunk_logs" {
+  // Receive from Loki pipeline
+  output {
+    logs = [
+      otelcol.exporter.splunkhec.splunk_endpoint.input,
+    ]
+  }
+}
+
+// Export to Splunk HEC using OTEL exporter
+otelcol.exporter.splunkhec "splunk_endpoint" {
+  // Splunk HEC specific settings (token must be in splunk block)
+  splunk {
+    // Splunk HEC token - Placeholder will be replaced by Puppet/Ansible deployment
+    token      = env("SPLUNK_HEC_TOKEN")
+    source     = "eventsproc"
+    sourcetype = "netbird:event"
+    index      = "netbird_events"
+  }
+
+  // Client configuration (endpoint, timeout, TLS)
+  client {
+    endpoint             = "https://splunk-hf.example.com:8088/services/collector"
+    timeout              = "10s"
+    insecure_skip_verify = true
+  }
+
+  // Retry configuration
+  retry_on_failure {
+    enabled          = true
+    initial_interval = "5s"
+    max_interval     = "30s"
+    max_elapsed_time = "300s"
+  }
+
+  // Queue settings for batching
+  sending_queue {
+    enabled       = true
+    num_consumers = 10
+    queue_size    = 1000
+  }
+}
