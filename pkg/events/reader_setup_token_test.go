@@ -53,7 +53,7 @@ func TestGetEvents_WithSetupToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	emailConfig := newMockEmailConfigSetupToken()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -113,7 +113,7 @@ func TestGetEvents_MixedUserTypes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	emailConfig := newMockEmailConfigSetupToken()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -181,7 +181,7 @@ func TestGetEvents_ServiceAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	emailConfig := newMockEmailConfigSetupToken()
 	reader := NewEventReader(db, logger, emailConfig)
