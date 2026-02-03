@@ -210,9 +210,7 @@ func (er *EventReader) GetEvents(ctx context.Context, opts EventQueryOptions) ([
 	if err != nil {
 		return nil, fmt.Errorf("failed to query events: %w", err)
 	}
-	defer func() {
-		_ = rows.Close()
-	}()
+	defer func() { _ = rows.Close() }()
 
 	// Parse results
 	events := []Event{}
