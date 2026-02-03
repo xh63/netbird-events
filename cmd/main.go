@@ -43,7 +43,11 @@ func main() {
 		logger.Error("Failed to create processor", "error", err)
 		os.Exit(1)
 	}
-	defer proc.Close()
+	defer func() {
+		if err := proc.Close(); err != nil {
+			logger.Error("Failed to close processor", "error", err)
+		}
+	}()
 
 	// Setup context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())

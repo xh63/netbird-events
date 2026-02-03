@@ -52,7 +52,9 @@ func TestNewEventReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -74,7 +76,9 @@ func TestGetEvents_NoFilters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -112,7 +116,9 @@ func TestGetEvents_WithAccountFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -157,7 +163,9 @@ func TestGetEvents_WithTimeFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -199,7 +207,9 @@ func TestGetEvents_WithActivityFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -246,7 +256,9 @@ func TestGetEvents_WithMinEventID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -290,7 +302,9 @@ func TestGetEvents_WithLimitAndOffset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -330,7 +344,9 @@ func TestGetEvents_DefaultLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -362,7 +378,9 @@ func TestGetEvents_NullValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -409,7 +427,9 @@ func TestGetEventCount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -440,7 +460,9 @@ func TestGetEventCount_WithFilters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -474,7 +496,9 @@ func TestGetCheckpoint_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -504,7 +528,9 @@ func TestGetCheckpoint_Found(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
@@ -550,17 +576,19 @@ func TestSaveCheckpoint_Insert(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
 
 	checkpoint := &ProcessingCheckpoint{
-		ConsumerID:             "test-consumer",
-		LastEventID:            100,
-		LastEventTimestamp:     time.Now(),
-		TotalEventsProcessed:   100,
-		ProcessingNode:         "test-node",
+		ConsumerID:           "test-consumer",
+		LastEventID:          100,
+		LastEventTimestamp:   time.Now(),
+		TotalEventsProcessed: 100,
+		ProcessingNode:       "test-node",
 	}
 
 	mock.ExpectExec("INSERT INTO idp.event_processing_checkpoint").
@@ -583,17 +611,19 @@ func TestSaveCheckpoint_Update(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
 
 	checkpoint := &ProcessingCheckpoint{
-		ConsumerID:             "test-consumer",
-		LastEventID:            200,
-		LastEventTimestamp:     time.Now(),
-		TotalEventsProcessed:   200,
-		ProcessingNode:         "test-node-2",
+		ConsumerID:           "test-consumer",
+		LastEventID:          200,
+		LastEventTimestamp:   time.Now(),
+		TotalEventsProcessed: 200,
+		ProcessingNode:       "test-node-2",
 	}
 
 	// ON CONFLICT DO UPDATE
@@ -617,17 +647,19 @@ func TestSaveCheckpoint_Error(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)
 
 	checkpoint := &ProcessingCheckpoint{
-		ConsumerID:             "test-consumer",
-		LastEventID:            100,
-		LastEventTimestamp:     time.Now(),
-		TotalEventsProcessed:   100,
-		ProcessingNode:         "test-node",
+		ConsumerID:           "test-consumer",
+		LastEventID:          100,
+		LastEventTimestamp:   time.Now(),
+		TotalEventsProcessed: 100,
+		ProcessingNode:       "test-node",
 	}
 
 	mock.ExpectExec("INSERT INTO idp.event_processing_checkpoint").
@@ -672,7 +704,9 @@ func TestGetEvents_QueryError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := newMockEmailConfig()
 	reader := NewEventReader(db, logger, emailConfig)

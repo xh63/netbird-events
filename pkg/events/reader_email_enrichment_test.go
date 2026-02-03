@@ -17,7 +17,9 @@ func TestEmailEnrichment_AisOktaUsers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := &mockEmailEnrichmentConfig{
 		enabled: true,
@@ -65,7 +67,9 @@ func TestEmailEnrichment_NetbirdUsers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := &mockEmailEnrichmentConfig{
 		enabled: true,
@@ -113,7 +117,9 @@ func TestEmailEnrichment_CustomTable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := &mockEmailEnrichmentConfig{
 		enabled:      true,
@@ -163,7 +169,9 @@ func TestEmailEnrichment_Auto(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := &mockEmailEnrichmentConfig{
 		enabled: true,
@@ -212,7 +220,9 @@ func TestEmailEnrichment_None(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := &mockEmailEnrichmentConfig{
 		enabled: true,
@@ -261,7 +271,9 @@ func TestEmailEnrichment_Disabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := &mockEmailEnrichmentConfig{
 		enabled: false,
@@ -310,7 +322,9 @@ func TestEmailEnrichment_UnknownSource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create mock database: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	emailConfig := &mockEmailEnrichmentConfig{
 		enabled: true,
