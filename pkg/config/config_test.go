@@ -76,17 +76,10 @@ region: "apac"
 	}
 
 	// Set environment variables
-	os.Setenv("EP_PLATFORM", "prod")
-	os.Setenv("EP_REGION", "emea")
-	os.Setenv("EP_BATCH_SIZE", "2000")
-	os.Setenv("EP_LOG_LEVEL", "error")
-
-	defer func() {
-		os.Unsetenv("EP_PLATFORM")
-		os.Unsetenv("EP_REGION")
-		os.Unsetenv("EP_BATCH_SIZE")
-		os.Unsetenv("EP_LOG_LEVEL")
-	}()
+	t.Setenv("EP_PLATFORM", "prod")
+	t.Setenv("EP_REGION", "emea")
+	t.Setenv("EP_BATCH_SIZE", "2000")
+	t.Setenv("EP_LOG_LEVEL", "error")
 
 	// Load config
 	cfg, err := LoadConfig(configFile)
@@ -262,13 +255,8 @@ batch_size: 500
 	}
 
 	// Set environment variables that should override file
-	os.Setenv("EP_PLATFORM", "prod")
-	os.Setenv("EP_BATCH_SIZE", "2000")
-
-	defer func() {
-		os.Unsetenv("EP_PLATFORM")
-		os.Unsetenv("EP_BATCH_SIZE")
-	}()
+	t.Setenv("EP_PLATFORM", "prod")
+	t.Setenv("EP_BATCH_SIZE", "2000")
 
 	cfg, err := LoadConfig(configFile)
 	if err != nil {

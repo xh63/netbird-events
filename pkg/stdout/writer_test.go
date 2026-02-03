@@ -45,12 +45,12 @@ func TestSendEvents_WritesToStdout(t *testing.T) {
 	}
 
 	// --- Restore stdout and read captured output ---
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, r)
-	r.Close()
+	_ = r.Close()
 
 	output := strings.TrimSpace(buf.String())
 
@@ -107,11 +107,11 @@ func TestSendEvent_Single(t *testing.T) {
 		t.Fatalf("SendEvent failed: %v", err)
 	}
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 	var buf bytes.Buffer
 	_, _ = io.Copy(&buf, r)
-	r.Close()
+	_ = r.Close()
 
 	output := strings.TrimSpace(buf.String())
 

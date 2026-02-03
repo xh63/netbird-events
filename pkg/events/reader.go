@@ -210,7 +210,7 @@ func (er *EventReader) GetEvents(ctx context.Context, opts EventQueryOptions) ([
 	if err != nil {
 		return nil, fmt.Errorf("failed to query events: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	// Parse results
 	events := []Event{}
@@ -296,7 +296,6 @@ func (er *EventReader) GetEventCount(ctx context.Context, opts EventQueryOptions
 	if opts.Activity != nil {
 		conditions = append(conditions, fmt.Sprintf("activity = $%d", argPos))
 		args = append(args, *opts.Activity)
-		argPos++
 	}
 
 	if len(conditions) > 0 {
