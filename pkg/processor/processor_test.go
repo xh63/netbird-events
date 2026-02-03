@@ -41,9 +41,7 @@ func TestNewProcessor_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create sqlmock: %v", err)
 	}
-	defer func() {
-		_ = db.Close()
-	}()
+	defer db.Close()
 
 	// Expect database ping
 	mock.ExpectPing()

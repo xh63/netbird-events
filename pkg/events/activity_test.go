@@ -6,10 +6,10 @@ import (
 
 func TestEnrichActivityInfo(t *testing.T) {
 	tests := []struct {
-		name         string
-		activity     int
-		expectedName string
-		expectedCode string
+		name             string
+		activity         int
+		expectedName     string
+		expectedCode     string
 	}{
 		{
 			name:         "User logged in peer",

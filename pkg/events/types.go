@@ -9,8 +9,8 @@ type Event struct {
 	ID             int64     `json:"id"`
 	Timestamp      time.Time `json:"timestamp"`
 	Activity       int       `json:"activity"`
-	ActivityName   string    `json:"activity_name"` // Human-readable activity name (e.g., "User logged in peer")
-	ActivityCode   string    `json:"activity_code"` // Machine-readable code (e.g., "user.peer.login")
+	ActivityName   string    `json:"activity_name"`   // Human-readable activity name (e.g., "User logged in peer")
+	ActivityCode   string    `json:"activity_code"`   // Machine-readable code (e.g., "user.peer.login")
 	InitiatorID    string    `json:"initiator_id"`
 	TargetID       string    `json:"target_id"`
 	AccountID      string    `json:"account_id"`
