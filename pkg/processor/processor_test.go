@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"gitlab.global.company.com/netbird/code/netbird-prov/eventsproc/pkg/config"
-	"gitlab.global.company.com/netbird/code/netbird-prov/pkg/events"
+	"github.com/xh63/netbird-events/pkg/config"
+	"github.com/xh63/netbird-events/pkg/events"
 )
 
 // mockWriter implements a simple mock writer for testing

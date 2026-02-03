@@ -1,8 +1,8 @@
 # GitHub Sanitization Report
 
-**Generated:** Tue Feb  3 17:20:15 AEDT 2026
+**Generated:** Tue Feb  3 18:01:11 AEDT 2026
 **Source:** /Users/david/git/ingenico/usrvpn/code/netbird-prov/eventsproc
-**Output:** /tmp/netbird-events-sanitized-80582
+**Output:** /tmp/netbird-events-sanitized-90134
 
 ## Summary
 
@@ -116,13 +116,13 @@
 
 ## Next Steps
 
-1. Review the sanitized code in: `/tmp/netbird-events-sanitized-80582`
+1. Review the sanitized code in: `/tmp/netbird-events-sanitized-90134`
 2. Check for any remaining sensitive information
 3. Update LICENSE copyright if needed
 4. Test the build: `make build` or equivalent
 5. Initialize git repository:
    ```bash
-   cd /tmp/netbird-events-sanitized-80582
+   cd /tmp/netbird-events-sanitized-90134
    git init
    git add .
    git commit -m "Initial commit"

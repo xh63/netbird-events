@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"gitlab.global.company.com/netbird/code/netbird-prov/eventsproc/pkg/config"
-	"gitlab.global.company.com/netbird/code/netbird-prov/pkg/events"
-	"gitlab.global.company.com/netbird/code/netbird-prov/pkg/stdout"
+	"github.com/xh63/netbird-events/pkg/config"
+	"github.com/xh63/netbird-events/pkg/events"
+	"github.com/xh63/netbird-events/pkg/stdout"
 )
 
 // EventWriter interface for sending events to an output (allows mocking in tests)

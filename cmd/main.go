@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"gitlab.global.company.com/netbird/code/netbird-prov/eventsproc/pkg/config"
-	"gitlab.global.company.com/netbird/code/netbird-prov/eventsproc/pkg/processor"
+	"github.com/xh63/netbird-events/pkg/config"
+	"github.com/xh63/netbird-events/pkg/processor"
 )
 
 var version = "dev"
