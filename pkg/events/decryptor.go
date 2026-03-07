@@ -9,7 +9,14 @@ import (
 
 // NetbirdDecryptor decrypts AES-256-GCM encrypted fields from NetBird's database.
 // NetBird encrypts sensitive columns (email, name) before writing to PostgreSQL or SQLite.
-// Wire format: [ nonce (12 bytes) | ciphertext | GCM auth tag (16 bytes) ]
+//
+// Verified against NetBird management server as of early 2026.
+// Wire format: base64( nonce[12 bytes] | ciphertext | GCM auth tag[16 bytes] )
+//
+// If NetBird changes its encryption scheme in a future release, this file will need
+// to be updated. The symptom is base64-looking strings appearing in initiator_email /
+// target_email output despite decryption being enabled. Check NetBird release notes
+// for any changes to field encryption and update the wire format parsing accordingly.
 type NetbirdDecryptor struct {
 	gcm cipher.AEAD
 }
