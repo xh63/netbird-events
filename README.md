@@ -182,6 +182,8 @@ email_enrichment:
 
 NetBird encrypts email and name fields using AES-256-GCM. Provide the key so eventsproc can decrypt them:
 
+> **Note:** `eventsproc` decryption is hardcoded to AES-256-GCM (the algorithm NetBird uses as of the time of writing). If a future NetBird release changes the encryption algorithm or wire format, decryption will silently return the raw ciphertext instead of the plaintext email. If you see base64-looking strings in `initiator_email` / `target_email` after enabling decryption, check the NetBird release notes and open an issue — the decryptor in `pkg/events/decryptor.go` will need to be updated.
+
 ```yaml
 email_enrichment:
   enabled: true
