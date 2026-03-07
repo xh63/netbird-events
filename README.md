@@ -1,11 +1,12 @@
 # NetBird Events Exporter
 
-Export NetBird audit events from PostgreSQL to centralized logging platforms (Loki, Splunk) via OpenTelemetry Collector.
+Export NetBird audit events from PostgreSQL or SQLite to centralized logging platforms (Loki, Splunk) via OpenTelemetry Collector.
 
 ## Overview
 
 `eventsproc` is a lightweight Go service that:
-- ✅ Reads events from NetBird PostgreSQL database
+- ✅ Reads events from NetBird's **PostgreSQL** or **SQLite** database
+- ✅ Decrypts AES-GCM encrypted email/name fields (NetBird encrypts these at rest)
 - ✅ Enriches events with user emails and activity names (configurable)
 - ✅ Outputs structured JSON to stdout
 - ✅ Forwards to Loki/Splunk via OpenTelemetry Collector
@@ -16,8 +17,9 @@ Export NetBird audit events from PostgreSQL to centralized logging platforms (Lo
 ## Architecture
 
 ```
-PostgreSQL → eventsproc → stdout → systemd journal → OTEL Collector → Loki/Splunk
-  (events)    (enriches)  (JSON)   (captures)        (forwards)       (stores)
+PostgreSQL  ┐
+            ├─→ eventsproc → stdout → systemd journal → OTEL Collector → Loki/Splunk
+SQLite      ┘   (enriches)   (JSON)   (captures)        (forwards)       (stores)
 ```
 
 **Key Design:**
@@ -68,19 +70,31 @@ sudo chmod +x /usr/local/bin/eventsproc
 
 Create `/etc/app/eventsproc/config.yaml`:
 
+**PostgreSQL (default):**
 ```yaml
-# Minimal configuration - only postgres_url is required
 postgres_url: "user=netbird password=YOUR_PASSWORD_HERE dbname=netbird host=postgres.example.com"
-polling_interval: 60  # Poll every 60 seconds
+polling_interval: 60
+```
+
+**SQLite (NetBird's built-in store):**
+```yaml
+database_driver: sqlite
+sqlite_path: /var/lib/netbird/store.db
+polling_interval: 60
 ```
 
 All other settings have sensible defaults. See `config.yaml.example` for full options.
 
 ### 3. Setup Database
 
+Create the checkpoint table in your database. SQL files are in the `lab/` directory:
+
 ```bash
-# Create checkpoint table
-psql -h postgres.example.com -U netbird -d netbird -f migrations/001_create_checkpoint_table.sql
+# PostgreSQL
+psql -h postgres.example.com -U netbird -d netbird -f lab/init-db.sql
+
+# SQLite
+sqlite3 /var/lib/netbird/store.db < lab/init-sqlite.sql
 ```
 
 ### 4. Run Service
@@ -104,24 +118,39 @@ To forward events to Loki/Splunk, configure OpenTelemetry Collector:
 
 ## Configuration
 
-### Required
-- `postgres_url` - Database connection string (or use `EP_POSTGRES_URL` env var)
+### Database
 
-### Optional
-- `platform` - Environment label (default: "sandbox")
-- `region` - Region label (default: "apac")
-- `consumer_id` - Checkpoint ID (default: auto-generated from platform+region)
-- `log_level` - Logging level (default: "info")
-- `batch_size` - Events per batch (default: 1000)
-- `lookback_hours` - Initial lookback on first run (default: 24)
-- `polling_interval` - Seconds between polls, 0=run once (default: 0)
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `database_driver` | `postgres` | Backend to use: `postgres` or `sqlite` |
+| `postgres_url` | — | PostgreSQL connection string. **Required** when `database_driver` is `postgres` |
+| `sqlite_path` | `/var/lib/netbird/store.db` | Path to NetBird's SQLite file. Only used when `database_driver` is `sqlite` |
+
+### General
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `platform` | `sandbox` | Environment label attached to events |
+| `region` | `apac` | Region label attached to events |
+| `consumer_id` | auto | Checkpoint identifier (auto-generated from platform+region) |
+| `log_level` | `info` | Logging level: `debug`, `info`, `warn`, `error` |
+| `batch_size` | `1000` | Events fetched per poll |
+| `lookback_hours` | `24` | How far back to look on first run |
+| `polling_interval` | `0` | Seconds between polls; `0` = run once and exit |
+| `metrics_port` | `2113` | Port for Prometheus `/metrics` endpoint |
 
 ### Environment Variables
 
 Override any config with `EP_` prefix:
 
 ```bash
+# PostgreSQL mode
 export EP_POSTGRES_URL="user=netbird password=YOUR_PASSWORD_HERE dbname=netbird host=db.example.com"
+
+# SQLite mode
+export EP_DATABASE_DRIVER=sqlite
+export EP_SQLITE_PATH=/var/lib/netbird/store.db
+
 export EP_PLATFORM="prod"
 export EP_REGION="emea"
 export EP_POLLING_INTERVAL=60
@@ -130,37 +159,38 @@ export EP_POLLING_INTERVAL=60
 
 ### Email Enrichment
 
-`eventsproc` can enrich events with user email addresses by joining with user tables. This is **optional** and highly configurable.
-
-**Background:**
-NetBird stores `user_id` (from Okta/OIDC) in events but not email addresses. The email enrichment feature looks up emails from various sources.
+`eventsproc` can enrich events with user email addresses by joining with user tables. This is **disabled by default** because NetBird encrypts the `users` table at rest — without the decryption key, joining it yields ciphertext blobs, not readable email addresses.
 
 **Configuration:**
 
 ```yaml
 email_enrichment:
-  enabled: true      # Default: true
-  source: "auto"     # Default: "auto"
+  enabled: false     # Default: false
+  source: "none"     # Default: "none"
 ```
 
 **Available Sources:**
 
 | Source | Description | Use Case |
 |--------|-------------|----------|
-| `auto` | Try multiple sources with fallback | **Recommended** - Works everywhere |
-| `ais_okta_users` | Company's custom `okta_users` table | Company deployments only |
+| `auto` | Try `users` table then fall back to `user_id` | Works for most NetBird deployments |
 | `netbird_users` | Standard NetBird `users` table | Standard NetBird installations |
 | `custom` | Custom schema/table | When you have your own user directory |
-| `none` | Disable (show `user_id` only) | When emails not needed |
+| `none` | No enrichment (show `user_id` only) | **Default** |
 
-**Auto Mode (Default):**
+**Enable with decryption (standard NetBird):**
 
-Tries sources in order with graceful fallback:
-1. `okta_users` table (if exists)
-2. `users` table (standard NetBird)
-3. `user_id` (if no email found)
+NetBird encrypts email and name fields using AES-256-GCM. Provide the key so eventsproc can decrypt them:
 
-This works for both Company deployments and standard NetBird installations.
+```yaml
+email_enrichment:
+  enabled: true
+  source: "auto"
+  # Option 1: provide the base64-encoded encryption key directly
+  netbird_encryption_key: "BASE64_ENCODED_32_BYTE_KEY"
+  # Option 2: point at NetBird's management.json (key is read automatically)
+  netbird_config_path: "/etc/netbird/management.json"
+```
 
 **Custom Table Example:**
 
@@ -173,36 +203,20 @@ email_enrichment:
 ```
 
 Your custom table must have:
-- `id` column (text/varchar) - matches NetBird `user_id`
-- `email` column (text/varchar) - email address
+- `id` column (text/varchar) — matches NetBird `user_id`
+- `email` column (text/varchar) — email address
 
 **Environment Variables:**
 
 ```bash
 export EP_EMAIL_ENRICHMENT_ENABLED=true
 export EP_EMAIL_ENRICHMENT_SOURCE="auto"
-export EP_EMAIL_ENRICHMENT_CUSTOM_SCHEMA="auth"
-export EP_EMAIL_ENRICHMENT_CUSTOM_TABLE="users"
+export EP_EMAIL_ENRICHMENT_NETBIRD_ENCRYPTION_KEY="BASE64_ENCODED_KEY"
+# or
+export EP_EMAIL_ENRICHMENT_NETBIRD_CONFIG_PATH="/etc/netbird/management.json"
 ```
 
-**Disable Email Enrichment:**
-
-```yaml
-email_enrichment:
-  enabled: false
-```
-
-Or:
-
-```bash
-export EP_EMAIL_ENRICHMENT_ENABLED=false
-```
-
-When disabled, events show `user_id` in `initiator_email` and `target_email` fields.
-
-**See Also:**
-- Full configuration details: `config.yaml.example`
-- Troubleshooting: Search for "EMAIL ENRICHMENT" in `config.yaml.example`
+When enrichment is disabled, `initiator_email` and `target_email` contain the raw `user_id`.
 
 ## Building
 
@@ -215,7 +229,7 @@ make all    # Format + lint + test + build
 
 **Requirements:**
 - Go 1.21+
-- PostgreSQL client libraries
+- No CGO required — SQLite driver is pure Go
 
 ## Deployment
 
@@ -262,7 +276,7 @@ Each instance maintains its own checkpoint and processes events independently.
 
 Events are output as JSON, one per line.
 
-**With email enrichment enabled (default):**
+**With email enrichment enabled:**
 
 ```json
 {
@@ -304,22 +318,24 @@ When email enrichment is disabled or no email is found, the `initiator_email` an
 
 - **[Setup Guide](docs/SETUP.md)** - Installation, deployment, and log forwarding
 - **[Technical Documentation](docs/TECH_DOC.md)** - Architecture and implementation details
-- **[Workflow Guide](docs/WORKFLOW.md)** - Processing workflow and operational guide
 - **[config.yaml.example](config.yaml.example)** - Full configuration reference
-- **[ALLOY_SETUP.md](ALLOY_SETUP.md)** - Grafana Alloy configuration for log forwarding
+- **[Lab Guide](lab/README.md)** - Docker lab with simulated and real NetBird modes
 
 ## Database Schema
 
-**Required Tables:**
-- `events` - NetBird audit events (standard NetBird table)
-- `idp.event_processing_checkpoint` - Processing state (created by migration scripts)
+**PostgreSQL — required tables:**
+- `events` — NetBird audit events (standard NetBird table)
+- `idp.event_processing_checkpoint` — Processing state (created by `lab/init-db.sql`)
 
-**Optional Tables (for email enrichment):**
-- `okta_users` - Company's Okta user cache (Company deployments only)
-- `users` - Standard NetBird users table (may have email field)
-- Custom user table - Your own user directory (specify via `custom_schema.custom_table`)
+**SQLite — required tables:**
+- `events` — NetBird's built-in event store
+- `event_processing_checkpoint` — Processing state (created by `lab/init-sqlite.sql`)
 
-Email enrichment automatically tries available sources based on your configuration. See [Email Enrichment](#email-enrichment) section.
+**Optional (for email enrichment):**
+- `users` — Standard NetBird users table (contains AES-GCM encrypted emails)
+- Custom user table — Your own user directory (configure via `custom_schema` / `custom_table`)
+
+See [Email Enrichment](#email-enrichment) for decryption setup.
 
 ## Monitoring
 
