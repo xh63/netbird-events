@@ -1,0 +1,149 @@
+services:
+  # ============================================================================
+  # PostgreSQL — shared by NetBird and eventsproc
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: lab-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-netbird}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-netbird-lab-pass}
+      POSTGRES_DB: ${POSTGRES_DB:-netbird}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-netbird} -d ${POSTGRES_DB:-netbird}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - lab-net
+
+  # ============================================================================
+  # Loki — log aggregation
+  # ============================================================================
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: lab-loki
+    restart: unless-stopped
+    user: "0"
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    volumes:
+      - ./configs/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - ./data/loki:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --output-document=- http://localhost:3100/ready | grep -q ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - lab-net
+
+  # ============================================================================
+  # Grafana — dashboards and datasources
+  # ============================================================================
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: lab-grafana
+    restart: unless-stopped
+    user: "0"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: "Viewer"
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+      - ./configs/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./configs/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+    depends_on:
+      loki:
+        condition: service_healthy
+    networks:
+      - lab-net
+
+  # ============================================================================
+  # Splunk — SIEM log collection via HEC
+  # ============================================================================
+  splunk:
+    image: splunk/splunk:latest
+    container_name: lab-splunk
+    restart: unless-stopped
+    environment:
+      SPLUNK_START_ARGS: "--accept-license"
+      SPLUNK_GENERAL_TERMS: "--accept-sgt-current-at-splunk-com"
+      SPLUNK_PASSWORD: ${SPLUNK_PASSWORD:-changeme123}
+      SPLUNK_HEC_TOKEN: ${SPLUNK_HEC_TOKEN:-lab-hec-token-123}
+    ports:
+      - "${SPLUNK_PORT:-8000}:8000"
+      - "${SPLUNK_HEC_PORT:-8088}:8088"
+    volumes:
+      - ./data/splunk/var:/opt/splunk/var
+      - ./data/splunk/etc:/opt/splunk/etc
+    networks:
+      - lab-net
+
+  # ============================================================================
+  # Alloy — collects Docker logs → Loki + Splunk, scrapes Prometheus metrics
+  # ============================================================================
+  alloy:
+    image: grafana/alloy:latest
+    container_name: lab-alloy
+    restart: unless-stopped
+    environment:
+      SPLUNK_HEC_TOKEN: ${SPLUNK_HEC_TOKEN:-lab-hec-token-123}
+    volumes:
+      - ./configs/alloy-config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --stability.level=generally-available
+      - --feature.community-components.enabled
+    depends_on:
+      loki:
+        condition: service_healthy
+    networks:
+      - lab-net
+
+  # ============================================================================
+  # eventsproc — reads NetBird events from PostgreSQL
+  # ============================================================================
+  eventsproc:
+    build:
+      context: ../
+      dockerfile: lab/Dockerfile
+    container_name: lab-eventsproc
+    restart: unless-stopped
+    ports:
+      - "${EP_METRICS_PORT:-2113}:2113"
+    volumes:
+      - ./data/eventsproc/config.yaml:/etc/app/eventsproc/config.yaml:ro
+      # Mount NetBird's config.yaml read-only so eventsproc can resolve
+      # server.store.encryptionKey without duplicating the secret.
+      #
+      # Industry best practice: sharing secrets via a mounted config file is a
+      # pragmatic shortcut suitable for a single-host or lab deployment. In
+      # production the recommended approach is a dedicated secrets manager
+      # (HashiCorp Vault, AWS Secrets Manager, Docker Swarm secrets, or
+      # Kubernetes Secrets). Each service should pull only the specific secret
+      # it needs — not an entire peer config that also contains DB credentials,
+      # auth tokens, and other unrelated sensitive values.
+      - ./data/netbird/config.yaml:/etc/netbird/config.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - lab-net
+
+networks:
+  lab-net:
+    external: true

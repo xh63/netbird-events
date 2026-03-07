@@ -1,0 +1,16 @@
+# docker-compose override for SQLite mode with real NetBird (LAB_MODE=2 DB_MODE=2)
+# Mounts the netbird_netbird_data named volume (where NetBird writes its events.db)
+# directly into eventsproc at /var/lib/netbird so it can read events in real time
+# and write its checkpoint table (event_processing_checkpoint) to events.db.
+#
+# Applied automatically by lab-setup.sh when LAB_MODE=2 and DB_MODE=2.
+# For simulated SQLite mode (LAB_MODE=1 DB_MODE=2) use docker-compose.sqlite.yml instead.
+
+services:
+  eventsproc:
+    volumes:
+      - netbird_netbird_data:/var/lib/netbird
+
+volumes:
+  netbird_netbird_data:
+    external: true

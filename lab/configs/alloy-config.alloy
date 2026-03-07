@@ -1,0 +1,199 @@
+// Lab Alloy configuration — adapted from config.alloy for Docker environment
+// Collects Docker container logs → Loki + Splunk HEC
+// Scrapes eventsproc + Alloy self-monitoring Prometheus metrics
+//
+// Label Strategy (Low Cardinality):
+//   - Labels: service_name (only 1 label for low cardinality)
+//   - Structured Metadata: log_type, activity
+//   - Query metadata with: {service_name="lab-eventsproc"} | log_type="application" | activity="user.login"
+//
+// Differences from production config.alloy:
+//   - Log source: loki.source.docker (not loki.source.journal — eventsproc runs in Docker, not systemd)
+//   - No mTLS — plain HTTP to Docker service names (loki:3100, splunk:8088)
+//   - Prometheus remote_write points to local placeholder (no standalone Prometheus in lab;
+//     Grafana queries eventsproc:2113/metrics directly)
+
+// ============================================================================
+// EVENTSPROC APPLICATION METRICS
+// ============================================================================
+
+// Scrape eventsproc Prometheus metrics from its Docker service name
+// Use discovery.relabel to override instance label with the actual hostname.
+discovery.relabel "eventsproc" {
+  targets = [{
+    __address__ = "eventsproc:2113",
+    job         = "eventsproc",
+  }]
+  rule {
+    target_label = "instance"
+    replacement  = constants.hostname
+  }
+}
+
+prometheus.scrape "eventsproc" {
+  targets    = discovery.relabel.eventsproc.output
+  forward_to = [prometheus.remote_write.prom_endpoint.receiver]
+
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+}
+
+// ============================================================================
+// ALLOY SELF-MONITORING METRICS
+// ============================================================================
+
+// Expose Alloy's own internal metrics (pipeline health, memory, dropped logs, etc.)
+prometheus.exporter.self "alloy_self" {}
+
+// Scrape Alloy's own metrics every 15 seconds
+prometheus.scrape "alloy_self" {
+  targets    = prometheus.exporter.self.alloy_self.targets
+  forward_to = [prometheus.remote_write.prom_endpoint.receiver]
+
+  scrape_interval = "15s"
+  scrape_timeout  = "10s"
+}
+
+// Placeholder remote write — no standalone Prometheus in lab
+// Grafana queries eventsproc:2113/metrics directly via the provisioned datasource
+prometheus.remote_write "prom_endpoint" {
+  endpoint {
+    url = "http://localhost:9090/api/v1/write"
+    queue_config {
+      max_samples_per_send = 100
+      batch_send_deadline  = "5s"
+    }
+  }
+}
+
+// ============================================================================
+// DOCKER LOG COLLECTION
+// ============================================================================
+
+// Discover Docker containers
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// Relabel: extract container name, keep only lab + NetBird containers
+discovery.relabel "docker_logs" {
+  targets = discovery.docker.containers.targets
+
+  // Extract container name (strip leading slash)
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  // Keep only lab and NetBird containers
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(lab-eventsproc|lab-postgres|netbird-.*)"
+    action        = "keep"
+  }
+
+  // Set service_name from container name (used for Loki label)
+  rule {
+    source_labels = ["container"]
+    target_label  = "service_name"
+  }
+}
+
+// Read Docker container logs
+loki.source.docker "container_logs" {
+  host    = "unix:///var/run/docker.sock"
+  targets = discovery.relabel.docker_logs.output
+
+  forward_to = [loki.process.filter_and_format.receiver]
+}
+
+// ============================================================================
+// LOG PROCESSING PIPELINE
+// ============================================================================
+
+// Extract classification fields and event data from JSON
+loki.process "filter_and_format" {
+
+  // Extract classification fields and event data from JSON
+  stage.json {
+    expressions = {
+      log_type     = "log_type",
+      event_source = "event_source",
+      activity     = "activity",
+      level        = "level",
+      msg          = "message",
+    }
+  }
+
+  // Add fields as structured metadata (queryable but not indexed as labels)
+  // These can be queried with | logfmt in Loki without increasing cardinality
+  stage.structured_metadata {
+    values = {
+      log_type = "log_type",
+      activity = "activity",
+    }
+  }
+
+  // Forward to both Loki and Splunk (no filter — all logs go to both destinations)
+  forward_to = [
+    loki.write.loki_endpoint.receiver,
+    otelcol.receiver.loki.splunk_logs.receiver,
+  ]
+}
+
+// Write to Loki (no TLS in lab — plain HTTP to Docker service name)
+loki.write "loki_endpoint" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+
+    // Batching configuration
+    batch_size = "1MB"
+    batch_wait = "1s"
+  }
+}
+
+// ============================================================================
+// SPLUNK HEC PIPELINE
+// ============================================================================
+
+// Convert Loki logs to OpenTelemetry format for Splunk
+otelcol.receiver.loki "splunk_logs" {
+  output {
+    logs = [
+      otelcol.processor.batch.splunk.input,
+    ]
+  }
+}
+
+otelcol.processor.batch "splunk" {
+  output {
+    logs = [otelcol.exporter.splunkhec.splunk_endpoint.input]
+  }
+}
+
+// Export to Splunk HEC (Splunk Docker image enforces HTTPS on port 8088)
+otelcol.exporter.splunkhec "splunk_endpoint" {
+  splunk {
+    token = env("SPLUNK_HEC_TOKEN")
+  }
+
+  client {
+    endpoint             = "https://splunk:8088/services/collector/event"
+    timeout              = "10s"
+    insecure_skip_verify = true
+  }
+
+  retry_on_failure {
+    enabled          = true
+    initial_interval = "5s"
+    max_interval     = "30s"
+    max_elapsed_time = "300s"
+  }
+
+  sending_queue {
+    enabled       = true
+    num_consumers = 10
+    queue_size    = 1000
+  }
+}

@@ -1,0 +1,7 @@
+# Runtime data — large, permission-restricted, not needed for build
+lab/data/
+
+# Dev tooling
+.git/
+.claude/
+*.md

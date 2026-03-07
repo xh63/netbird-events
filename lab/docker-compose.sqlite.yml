@@ -1,0 +1,12 @@
+# docker-compose override for SQLite (built-in store) mode
+# Applied automatically by lab-setup.sh when DB_MODE=2
+# Usage: docker compose -f docker-compose.lab.yml -f docker-compose.sqlite.yml up -d
+#
+# EP_SQLITE_HOST_PATH must be set in the environment before running:
+#   Simulated mode : ./data/sqlite/store.db
+#   Real NetBird   : ./data/netbird/store.db
+
+services:
+  eventsproc:
+    volumes:
+      - ${EP_SQLITE_HOST_PATH:-./data/sqlite/store.db}:/var/lib/netbird/store.db
