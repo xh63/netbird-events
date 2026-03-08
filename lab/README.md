@@ -2,6 +2,8 @@
 
 A self-contained Docker environment for evaluating **eventsproc** — the audit event exporter for [NetBird](https://netbird.io). Run it against simulated data or your own live NetBird instance and see events flowing into Grafana and Splunk in minutes.
 
+> **Tested against NetBird v0.66.2.** The lab uses whatever version of the NetBird repo is cloned at `~/netbird` on the server — it is not pinned. If you use a significantly newer or older version and encounter issues, check for breaking changes in the [NetBird changelog](https://github.com/netbirdio/netbird/releases). The AES-GCM encryption format for user fields is particularly version-sensitive — see the note in the main [README](../README.md#email-enrichment).
+
 ---
 
 ## What You Get
