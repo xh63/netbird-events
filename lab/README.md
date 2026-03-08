@@ -3,6 +3,8 @@
 A self-contained Docker environment for evaluating **eventsproc** — the audit event exporter for [NetBird](https://netbird.io). Run it against simulated data or your own live NetBird instance and see events flowing into Grafana and Splunk in minutes.
 
 > **Tested against NetBird v0.66.2.** The lab uses whatever version of the NetBird repo is cloned at `~/netbird` on the server — it is not pinned. If you use a significantly newer or older version and encounter issues, check for breaking changes in the [NetBird changelog](https://github.com/netbirdio/netbird/releases). The AES-GCM encryption format for user fields is particularly version-sensitive — see the note in the main [README](../README.md#email-enrichment).
+>
+> **Reverse proxy assumption:** `lab-setup.sh` patches NetBird's `getting-started.sh` to select **Traefik (option `0`)** as the reverse proxy. As of v0.66.2 the options are `[0] Traefik` / `[1] Existing Traefik` / `[4] Caddy`. If a future NetBird release adds new proxy options, reorders them, or changes the default index, the lab's sed patches (`REVERSE_PROXY_TYPE="0"`) may silently select the wrong proxy or fail to match at all, causing the setup to break or prompt interactively. If Real NetBird mode hangs or produces unexpected output, check `infrastructure_files/getting-started.sh` in your NetBird repo and update the `REVERSE_PROXY_TYPE` value in `lab-setup.sh` accordingly.
 
 ---
 
