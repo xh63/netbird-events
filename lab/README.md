@@ -37,6 +37,18 @@ The NetBird stack is only started in **Real NetBird mode** (option 2). In simula
 
 **If you just want to see events flow — use simulated mode. No domain or cloud account needed.**
 
+#### About the domain requirement (Real NetBird mode)
+
+The lab uses Cloudflare's DNS API to automatically provision a Let's Encrypt TLS certificate via DNS challenge. This means:
+
+- Your domain's **nameservers must point to Cloudflare** — the domain itself does not need to be *registered* at Cloudflare. You can register it anywhere (Namecheap, Porkbun, Google Domains, etc.) and then update the nameservers to Cloudflare's.
+- Cloudflare's free plan is sufficient — you just need the DNS management capability.
+- You only need **one subdomain** pointing at your server (e.g. `netbird.yourdomain.com`). You don't need to dedicate the whole domain to this.
+
+**Getting a domain cheaply:**
+- Many registrars offer domains for under $10/year — `.com` is typically $10–12, but `.xyz`, `.dev`, `.app`, `.io` and others can be cheaper.
+- Some registrars (Freenom, etc.) have offered free domains in the past — availability varies, so search "free domain name" and good luck.
+
 ### Software
 
 Everything below is installed automatically by `bootstrap-rocky.sh` on a fresh machine. For existing servers you need: **Docker Engine**, **jq**, **yq**.
