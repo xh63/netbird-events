@@ -25,16 +25,18 @@ err()  { echo -e "${RED}[lab]${NC} $*" >&2; }
 info() { echo -e "${CYAN}[lab]${NC} $*"; }
 
 # ============================================================================
-# 1. Check prerequisites (auto-install on Rocky Linux if missing)
+# 1. Check prerequisites (auto-install on dnf-based distros if missing)
+#    Covers: Rocky Linux, RHEL, AlmaLinux, CentOS Stream, Fedora, and any
+#    other distro that uses dnf as its package manager.
 # ============================================================================
 log "Checking prerequisites..."
 
-IS_ROCKY=false
-if grep -qi "rocky" /etc/os-release 2>/dev/null; then
-  IS_ROCKY=true
+HAS_DNF=false
+if command -v dnf &>/dev/null; then
+  HAS_DNF=true
 fi
 
-# Auto-install a package via dnf (Rocky Linux only)
+# Auto-install a package via dnf
 dnf_install() {
   local pkg=$1
   log "Installing $pkg via dnf..."
@@ -43,9 +45,9 @@ dnf_install() {
     || { err "Failed to install $pkg — install it manually and re-run"; exit 1; }
 }
 
-# docker — if missing on Rocky, install Docker CE from the official repo
+# docker — if missing on dnf-based distros, install Docker CE from the official repo
 if ! command -v docker &>/dev/null; then
-  if $IS_ROCKY; then
+  if $HAS_DNF; then
     log "docker not found — installing Docker CE..."
     sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo &>/dev/null
     sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin &>/dev/null \
@@ -61,7 +63,7 @@ fi
 
 # docker compose plugin
 if ! docker compose version &>/dev/null; then
-  if $IS_ROCKY; then
+  if $HAS_DNF; then
     dnf_install docker-compose-plugin
   else
     err "docker compose plugin not found"
@@ -71,7 +73,7 @@ fi
 
 # jq
 if ! command -v jq &>/dev/null; then
-  if $IS_ROCKY; then
+  if $HAS_DNF; then
     dnf_install jq
   else
     err "Required command not found: jq"
@@ -79,8 +81,8 @@ if ! command -v jq &>/dev/null; then
   fi
 fi
 
-# yq (snap only — not in dnf)
-if ! command -v yq &>/dev/null && $IS_ROCKY; then
+# yq (snap only — not in dnf repos)
+if ! command -v yq &>/dev/null && $HAS_DNF; then
   log "yq not found — installing via snap..."
   if ! command -v snap &>/dev/null; then
     sudo dnf install -y snapd &>/dev/null && sudo systemctl enable --now snapd.socket &>/dev/null || true
@@ -244,7 +246,7 @@ if [[ "$DB_MODE" == "2" ]]; then
   else
     if ! command -v sqlite3 &>/dev/null; then
       err "sqlite3 is required for simulated SQLite mode"
-      err "Install with: sudo dnf install sqlite  (Rocky/RHEL)  or  sudo apt install sqlite3  (Debian/Ubuntu)"
+      err "Install with: sudo dnf install sqlite  (dnf-based distros)  or  sudo apt install sqlite3  (Debian/Ubuntu)"
       exit 1
     fi
     EP_SQLITE_PATH="/var/lib/netbird/store.db"
