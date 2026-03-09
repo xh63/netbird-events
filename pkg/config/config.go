@@ -96,6 +96,7 @@ type netbirdConfigFile struct {
 // readEncryptionKeyFromNetbirdConfig parses a NetBird config.yaml file and
 // returns the decoded AES-256 store encryption key.
 func readEncryptionKeyFromNetbirdConfig(path string) ([]byte, error) {
+	// #nosec G304 -- Path is provided by the administrator via config/flags, not by an external user.
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read netbird config %q: %w", path, err)

@@ -49,7 +49,14 @@ func main() {
 	http.Handle("/metrics", promhttp.HandlerFor(metrics.MyRegistry, promhttp.HandlerOpts{}))
 	go func() {
 		logger.Info("Starting Prometheus metrics server", "port", cfg.MetricsPort)
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.MetricsPort), nil); err != nil {
+		srv := &http.Server{
+			Addr:              fmt.Sprintf(":%d", cfg.MetricsPort),
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      10 * time.Second,
+			IdleTimeout:       120 * time.Second,
+		}
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("Failed to start Prometheus metrics server", "error", err)
 		}
 	}()
