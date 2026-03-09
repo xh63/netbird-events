@@ -663,8 +663,11 @@ else
       docker run --rm \
         -v netbird_netbird_data:/data \
         -v "$SCRIPT_DIR/init-sqlite.sql":/init.sql:ro \
-        alpine sh -c "apk add --no-cache sqlite &>/dev/null && sqlite3 /data/events.db < /init.sql"
+        alpine sh -c "apk add --no-cache sqlite &>/dev/null && sqlite3 /data/events.db < /init.sql && chmod 666 /data/events.db"
       log "Checkpoint table ready in events.db"
+      # chmod 666 above: eventsproc runs as a non-root user (see lab/Dockerfile) so it
+      # needs write access to events.db to save checkpoints. NetBird creates the file as
+      # root:root 644 — world-write is acceptable in this single-host lab environment.
     fi
   fi
 fi

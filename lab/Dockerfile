@@ -16,10 +16,13 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w -X main.version=$(cat vers
 # Stage 2: Runtime
 FROM alpine:3.21
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -S eventsproc && adduser -S eventsproc -G eventsproc
+
 COPY --from=builder /eventsproc /usr/local/bin/eventsproc
 
-RUN mkdir -p /etc/app/eventsproc
+RUN mkdir -p /etc/app/eventsproc && chown -R eventsproc:eventsproc /etc/app/eventsproc
 EXPOSE 2113
 
+USER eventsproc
 ENTRYPOINT ["/usr/local/bin/eventsproc", "--config", "/etc/app/eventsproc/config.yaml"]
