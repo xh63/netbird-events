@@ -51,7 +51,29 @@ The lab uses Cloudflare's DNS API to automatically provision a Let's Encrypt TLS
 
 ### Software
 
-Everything below is installed automatically by `bootstrap-rocky.sh` on a fresh machine. For existing servers you need: **Docker Engine**, **jq**, **yq**.
+Everything below is installed automatically by `bootstrap-rhel.sh` on a fresh dnf-based machine. For existing servers you need: **Docker Engine**, **jq**, **yq**.
+
+---
+
+## Intended Flow
+
+```
+1. bootstrap-rhel.sh   (once, as root, on a fresh server)
+        ↓
+   Creates user + passwordless sudo + installs Docker/jq/yq + clones repos
+        ↓
+2. SSH in as your user
+        ↓
+3. Place Cloudflare token in lab/secrets/cf-token  (Real NetBird mode only)
+        ↓
+4. cp lab.env.example lab.env  →  edit lab.env
+        ↓
+5. ./lab-setup.sh
+        ↓
+   Events flowing into Grafana + Splunk within 30 seconds
+```
+
+`lab-setup.sh` assumes the environment is already prepared. If you skip bootstrap (e.g. Docker is already installed), `lab-setup.sh` will attempt to auto-install missing tools on dnf-based systems, but bootstrap is the recommended path for a clean start.
 
 ---
 
@@ -74,14 +96,22 @@ LAB_MODE=1 ./lab-setup.sh
 
 ---
 
-### Step 1: Bootstrap the Server *(fresh Rocky Linux 10 only)*
+### Step 1: Bootstrap the Server *(fresh dnf-based server only)*
 
-The bootstrap script runs **as root** on the server. It creates your user, configures SSH key auth, grants passwordless sudo, installs all tools, and clones both repos.
+Skip this step if Docker, jq, and yq are already installed on your server.
+
+`bootstrap-rhel.sh` runs **as root** on the server and handles everything in one shot:
+- Installs Docker CE, jq, yq
+- Creates your user with passwordless sudo
+- Configures SSH key authentication
+- Clones both `netbird-events` and `netbird` repos into the user's home directory
+
+Supports: **Rocky Linux, RHEL, AlmaLinux, CentOS Stream, Fedora** — any distro with `dnf`.
 
 **Option A — pipe from your Mac (recommended):**
 
 ```bash
-ssh root@YOUR_SERVER_IP 'bash -s' < lab/bootstrap-rocky.sh -- \
+ssh root@YOUR_SERVER_IP 'bash -s' < lab/bootstrap-rhel.sh -- \
   --user YOUR_USER \
   --ssh-key "$(cat ~/.ssh/id_ed25519.pub)"
 ```
@@ -89,12 +119,12 @@ ssh root@YOUR_SERVER_IP 'bash -s' < lab/bootstrap-rocky.sh -- \
 **Option B — run directly on the server:**
 
 ```bash
-sudo bash bootstrap-rocky.sh \
+sudo bash bootstrap-rhel.sh \
   --user YOUR_USER \
   --ssh-key "ssh-ed25519 AAAA...your-key..."
 ```
 
-After bootstrap, log in as your user — `~/netbird-events` is already cloned and ready.
+After bootstrap, log in as `YOUR_USER` — `~/netbird-events` is already cloned and ready.
 
 ---
 
@@ -268,7 +298,7 @@ To rebuild from scratch:
 
 ```
 lab/
-├── bootstrap-rocky.sh        # Bootstrap a fresh Rocky Linux server
+├── bootstrap-rhel.sh         # Bootstrap a fresh dnf-based server (Rocky, RHEL, AlmaLinux, etc.)
 ├── lab-setup.sh              # Start the lab (prompts for lab + DB mode)
 ├── lab-teardown.sh           # Stop and destroy everything
 ├── lab.env.example           # Configuration template (copy to lab.env)

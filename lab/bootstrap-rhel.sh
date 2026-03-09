@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bootstrap-rocky.sh — Bootstrap a fresh Rocky Linux 10 (or RHEL-compatible) machine
-# for the netbird-events lab environment.
+# bootstrap-rhel.sh — Bootstrap a fresh dnf-based Linux machine for the netbird-events lab.
+# Supports: Rocky Linux, RHEL, AlmaLinux, CentOS Stream, Fedora, and any other dnf-based distro.
 #
 # Usage:
-#   sudo bash bootstrap-rocky.sh
-#   sudo bash bootstrap-rocky.sh --user david --ssh-key "ssh-ed25519 AAAA..."
-#   ssh root@192.168.101.6 'bash -s' < bootstrap-rocky.sh -- --user david --ssh-key "$(cat ~/.ssh/id_ed25519.pub)"
+#   sudo bash bootstrap-rhel.sh
+#   sudo bash bootstrap-rhel.sh --user YOUR_USER --ssh-key "ssh-ed25519 AAAA..."
+#   ssh root@YOUR_SERVER_IP 'bash -s' < bootstrap-rhel.sh -- --user YOUR_USER --ssh-key "$(cat ~/.ssh/id_ed25519.pub)"
 set -euo pipefail
 
 # ============================================================================
@@ -137,7 +137,7 @@ esac
 # ============================================================================
 # Track completed steps (idempotency)
 # ============================================================================
-BOOTSTRAP_STATE_DIR="/var/lib/bootstrap-rocky"
+BOOTSTRAP_STATE_DIR="/var/lib/netbird-events-bootstrap"
 mkdir -p "$BOOTSTRAP_STATE_DIR"
 
 step_done() { [[ -f "$BOOTSTRAP_STATE_DIR/$1" ]]; }
