@@ -586,12 +586,8 @@ else
 
   log "Traefik patched for Cloudflare DNS challenge"
 
-  # --- 12d. Add wildcard cert domains to all HTTPS routers (SecOps pattern) ---
-  # Extracts the base domain (last two labels) so a single *.base cert covers all
-  # subdomains — mirrors the tls.domains[0].main/sans pattern used in SecOps/Traefikv3.
-  # e.g. NETBIRD_DOMAIN=netbird.example.com  →  NETBIRD_BASE_DOMAIN=example.com
-  NETBIRD_BASE_DOMAIN=$(echo "$NETBIRD_DOMAIN" | awk -F. '{print $(NF-1)"."$NF}')
-  log "Adding wildcard cert domains (main=${NETBIRD_BASE_DOMAIN}, sans=*.${NETBIRD_BASE_DOMAIN})..."
+  # --- 12d. Add FQDN cert domain to all HTTPS routers ---
+  log "Adding explicit cert domains (main=${NETBIRD_DOMAIN})..."
 
   for svc in $(yq '.services | keys | .[]' "$NB_COMPOSE"); do
     labels_type=$(yq ".services.${svc}.labels | type" "$NB_COMPOSE" 2>/dev/null || echo "!!null")
@@ -600,14 +596,13 @@ else
       [[ -z "$rname" ]] && continue
       # Remove any pre-existing tls.domains entries for this router (idempotent)
       yq -i ".services.${svc}.labels = (.services.${svc}.labels | map(select(test(\"traefik.http.routers\\.${rname}\\.tls\\.domains\") | not)))" "$NB_COMPOSE"
-      # Add wildcard cert domains matching SecOps pattern
+      # Add explicit cert domains using the FQDN
       yq -i ".services.${svc}.labels += [
-        \"traefik.http.routers.${rname}.tls.domains[0].main=${NETBIRD_BASE_DOMAIN}\",
-        \"traefik.http.routers.${rname}.tls.domains[0].sans=*.${NETBIRD_BASE_DOMAIN}\"
+        \"traefik.http.routers.${rname}.tls.domains[0].main=${NETBIRD_DOMAIN}\"
       ]" "$NB_COMPOSE"
     done < <(yq ".services.${svc}.labels[] | select(test(\"traefik.http.routers\\..*\\.tls\\.certresolver\")) | capture(\"traefik.http.routers.(?P<r>[^.]+)\\.tls\\.certresolver\").r" "$NB_COMPOSE" 2>/dev/null | sort -u)
   done
-  log "Wildcard cert domains added"
+  log "Cert domains added"
 
   # ============================================================================
   # 13. Start NetBird
