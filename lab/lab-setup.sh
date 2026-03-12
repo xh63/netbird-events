@@ -176,11 +176,7 @@ fi
 if [[ "$LAB_MODE" == "2" ]]; then
   # Real NetBird: auto-set the decryption key path (container mount defined in docker-compose)
   : "${EP_NETBIRD_CONFIG_PATH:=/etc/netbird/config.yaml}"
-  if [[ "$DB_MODE" == "2" ]]; then
-    # SQLite mode: activity events are in events.db; users table is in store.db (different file).
-    # Cross-database JOINs aren't supported without ATTACH — disable email enrichment.
-    EP_EMAIL_ENRICHMENT_SOURCE="none"
-  fi
+
   # Validate NETBIRD_DOMAIN is set
   if [[ -z "$NETBIRD_DOMAIN" || "$NETBIRD_DOMAIN" == "use-ip" ]]; then
     err "NETBIRD_DOMAIN must be set to the DNS name pointing at this server (e.g. netbird.example.com)"
@@ -242,6 +238,9 @@ if [[ "$DB_MODE" == "2" ]]; then
     # NetBird stores activity events in events.db (not store.db which holds peers/accounts)
     EP_SQLITE_PATH="/var/lib/netbird/events.db"
     EP_SQLITE_HOST_PATH="./data/netbird/events.db"
+    # SQLite mode: activity events are in events.db; users table is in store.db (different file).
+    # Cross-database JOINs aren't supported without ATTACH — disable email enrichment.
+    EP_EMAIL_ENRICHMENT_SOURCE="none"
     log "Database: SQLite — will read from NetBird's events.db"
   else
     if ! command -v sqlite3 &>/dev/null; then
